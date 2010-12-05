@@ -1,5 +1,8 @@
-{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction,
-             ViewPatterns, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts,
+             NoMonomorphismRestriction,
+             ViewPatterns,
+             FlexibleInstances #-}
+{-# OPTIONS -fno-warn-missing-signatures #-}
 module Language.Lisk.Parser where
 
 import Data.List
@@ -85,7 +88,7 @@ liskPatBind = parens $ do
   rhs <- liskRhs
   binds <- liskBinds
   return $ PatBind loc pat Nothing rhs binds
-  
+
 liskFunBind = FunBind <$> sepBy1 liskMatch spaces1
 
 liskMatch = parens $ do
@@ -194,7 +197,7 @@ liskSymbol = Symbol <$> many1 liskIdentifierToken
 liskList = mzero -- TODO
 
 liskImportDecl = parens $ do
-  symbolOf "import" <?> "import"
+  symbolOf "import" <?> "import list e.g. (import prelude data.list (system.char is-upper to-lower))"
   spaces1
   sepBy1 liskImportDeclModule spaces1
   
