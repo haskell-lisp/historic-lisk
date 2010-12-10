@@ -37,15 +37,16 @@ printLisk str =
     Left e   -> error $ show e ++ suggest
     Right ex -> putStrLn $ prettyPrint ex
 
-liskModule = parens $ do
+liskModule = do
   loc <- getLoc
+  string "("
   symbolOf "module" <?> "module"
-  spaces1
-  name <- liskModuleName
+  string ")"
+  importDecls <- concat <$> many (try $ spaces *> liskImportDecl)
   spaces
-  importDecls <- liskImportDecl
+  decls <- many $ try $ spaces *> liskDecl
   spaces
-  decls <- sepBy liskDecl spaces
+  eof
   return $ Module loc name [] Nothing Nothing importDecls decls
 
 symbolOf = string
@@ -89,7 +90,7 @@ liskPatBind = parens $ do
   binds <- liskBinds
   return $ PatBind loc pat Nothing rhs binds
 
-liskFunBind = FunBind <$> sepBy1 liskMatch spaces1
+liskFunBind = FunBind <$> many1 (try $ spaces *> liskMatch)
 
 liskMatch = parens $ do
   loc <- getLoc
@@ -121,6 +122,7 @@ liskExp = try liskVar
           <|> try liskLit
           <|> try liskApp
 
+          <|> parens liskExp
 liskApp = try liskTupleApp <|> try liskOpApp <|> try liskIdentApp <|> liskOpPartial
 
 liskTupleApp = parens $ do
