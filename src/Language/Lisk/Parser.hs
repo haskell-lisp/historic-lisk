@@ -52,6 +52,7 @@ liskModule = do
   eof
   return $ Module loc name [] Nothing Nothing importDecls decls
 
+  
 symbolOf = string
 
 liskDecl = try liskTypeSig <|> try liskFunBind <|> liskPatBind
@@ -114,7 +115,10 @@ liskBDecls = BDecls <$> pure [] -- TODO
 
 liskIPBinds = IPBinds <$> pure [] -- TODO
 
-liskPat = liskPVar -- TODO
+liskPat = liskPVar
+      <|> liskPLit -- TODO
+
+liskPLit = PLit <$> liskLit
 
 liskRhs = liskUnguardedRhs
 
@@ -122,10 +126,10 @@ liskUnguardedRhs = UnGuardedRhs <$> liskExp
 
  -- TODO
 liskExp = try liskVar
-          <|> try liskLit
+          <|> Lit <$> try liskLit
           <|> try liskApp
-
           <|> parens liskExp
+
 liskApp = try liskTupleApp <|> try liskOpApp <|> try liskIdentApp <|> liskOpPartial
 
 liskTupleApp = parens $ do
@@ -156,7 +160,7 @@ liskOpPartial = parens $ do
 
 liskOp = UnQual . Symbol <$> many1 (oneOf ".*-+/\\=<>")
 
-liskLit = Lit <$> (liskChar <|> try liskString <|> liskInt)
+liskLit = liskChar <|> try liskString <|> liskInt
 
 liskChar = Char <$> (string "\\" *> (space <|> newline <|> noneOf "\n \t"))
     where space = const ' ' <$> string "Space"
