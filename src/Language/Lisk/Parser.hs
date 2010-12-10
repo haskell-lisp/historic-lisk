@@ -54,7 +54,7 @@ liskDecl = try liskTypeSig <|> try liskFunBind <|> liskPatBind
 
 liskTypeSig = parens $ do
   loc <- getLoc
-  symbolOf "::" <?> "type signature e.g. (:: x :string)"
+  symbolOf "::" <?> "type signature e.g. (:: x 'string)"
   spaces1
   idents <- pure <$> liskIdent <|>
             parens (sepBy1 liskIdent spaces1)
@@ -80,7 +80,7 @@ liskTyVar = TyVar <$> liskName
 
 liskPatBind = parens $ do
   loc <- getLoc
-  symbolOf "=" <?> "pattern binding e.g. (= x \"Hello, World!\")"
+  symbolOf "=" <?> "pattern binding e.g. (= hello-world \"Hello, World!\")"
   spaces1
   pat <- liskPat
   typ <- return Nothing -- liskType -- TODO
@@ -93,7 +93,7 @@ liskFunBind = FunBind <$> sepBy1 liskMatch spaces1
 
 liskMatch = parens $ do
   loc <- getLoc
-  symbolOf "=" <?> "pattern binding e.g. (= x \"Hello, World!\")"
+  symbolOf "=" <?> "function binding e.g. (= id (x) x)"
   spaces1
   name <- liskName
   spaces1
@@ -186,10 +186,10 @@ liskName = try liskIdent <|> liskSymbol
 liskVar = Var <$> liskUnQual
 
 liskIdent = Ident . hyphenToCamelCase . colonToConsTyp <$> ident where
-    ident = ((++) <$> (string ":" <|> pure "")
+    ident = ((++) <$> (string "'" <|> pure "")
                   <*> many1 liskIdentifierToken)
 
-colonToConsTyp (':':x:xs) = toUpper x : xs
+colonToConsTyp ('\'':x:xs) = toUpper x : xs
 colonToConsTyp xs = xs
 
 liskSymbol = Symbol <$> many1 liskIdentifierToken
@@ -221,7 +221,7 @@ liskImportDeclModuleName = do
     , importSpecs = Nothing
     }
 
-liskModuleName = (<?> "module name (e.g. `:module.some-name')") $ do
+liskModuleName = (<?> "module name (e.g. `module.some-name')") $ do
   parts <- sepBy1 modulePart (string ".")
   return $ ModuleName $ intercalate "." parts
   where modulePart = format <$> many1 liskIdentifierToken
