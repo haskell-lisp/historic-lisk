@@ -41,6 +41,9 @@ liskModule = do
   loc <- getLoc
   string "("
   symbolOf "module" <?> "module"
+  spaces1
+  name <- liskModuleName
+  docstring <- try (spaces1 *> liskString) <|> return (String "")
   string ")"
   importDecls <- concat <$> many (try $ spaces *> liskImportDecl)
   spaces
