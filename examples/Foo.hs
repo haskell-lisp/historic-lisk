@@ -1,15 +1,16 @@
 {-# OPTIONS -F -pgmF lisk #-}
-(module :fibs
-  (import :system.environment)
 
-  (:: main (:i-o ()))
-  (= main (>>= get-args (. print fib read head)))
+(module demo
+  "A demo program!")
 
-  (:: test (-> :string (, :int :string)))
-  (= test (, 1))
+(import data.char)
+(import system.io)
 
-  (:: fib (-> :int :int))
-  (= fib 0 0)
-  (= fib 1 1)
-  (= fib n (+ (fib (- n 1))
-              (fib (- n 2)))))
+(= main (foo "Hello, World!"))
+
+(= foo x (put-str-ln (show (fib (read x)))))
+
+(= fib 0 0)
+(= fib 1 1)
+(= fib n (+ (fib (- n 1))
+            (fib (- n 2))))
