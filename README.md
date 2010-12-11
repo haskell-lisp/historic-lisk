@@ -12,8 +12,7 @@ Latest working example:
     (module demo
       "A demo program!")
 
-    (import data.char)
-    (import system.io)
+    (import data.char system.io)
 
     (:: main ('io ()))
     (= main (foo "Hello, World!"))
