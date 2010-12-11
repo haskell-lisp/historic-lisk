@@ -15,7 +15,9 @@ Latest working example:
     (import data.char system.io)
 
     (:: main ('io ()))
-    (= main (foo "Hello, World!"))
+    (= main (do (<- line get-line)
+                (let (= the-line line))
+                (foo the-line)))
 
     (:: foo (-> 'string ('io ())))
     (= foo x (put-str-ln (show (fib (read x)))))

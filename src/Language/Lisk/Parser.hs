@@ -114,7 +114,8 @@ liskMatch = parens $ do
 
 liskBinds = try liskBDecls <|> liskIPBinds
 
-liskBDecls = BDecls <$> pure [] -- TODO
+liskBDecls = BDecls <$> many (spaces *> decls) where
+  decls = try liskTypeSig <|> try liskFunBind <|> liskPatBind
 
 liskIPBinds = IPBinds <$> pure [] -- TODO
 
@@ -139,8 +140,40 @@ liskUnguardedRhs = UnGuardedRhs <$> liskExp
  -- TODO
 liskExp = try liskVar
           <|> Lit <$> try liskLit
+          <|> try liskDo
           <|> try liskApp
-          <|> parens liskExp
+          <|> Paren <$> parens liskExp
+          
+liskDo = parens $ do
+  string "do" <?> "do expression e.g. (do (<- x y) (return x))"
+  spaces1
+  stmts <- many $ spaces *> liskStmt
+  return $ Do stmts
+  
+x = do x <- return 1
+       return 1
+
+liskStmt = try liskGenerator <|> 
+           try liskLetStmt <|> 
+           liskQualifier -- TODO: There are more.
+
+liskQualifier = Qualifier <$> liskExp
+
+liskGenerator = parens $ do
+  loc <- getLoc
+  string "<-" <?> "do binding e.g. (<- x (return k))"
+  spaces1
+  pat <- liskPat <?> "binding pattern e.g. (<- ('just x) (return 1))"
+  spaces1
+  e <- liskExp
+  return $ Generator loc pat e
+
+liskLetStmt = parens $ do
+  loc <- getLoc
+  string "let" <?> "do let e.g. (let (= x 2))"
+  spaces1
+  binds <- liskBinds
+  return $ LetStmt binds
 
 liskApp = try liskTupleApp <|> try liskOpApp <|> try liskIdentApp <|> liskOpPartial
 
