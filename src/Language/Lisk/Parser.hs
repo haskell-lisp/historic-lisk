@@ -124,7 +124,14 @@ liskSimplePat = liskPVar
       
 liskPat = liskPVar
       <|> liskPLit
-      <|> liskPApp -- TODO
+      <|> try liskPTuple
+      <|> liskPApp
+      -- TODO: There are a lot more.
+
+liskPTuple = parens $ do
+  char ','
+  args <- many1 $ spaces1 *> liskPat
+  return $ PTuple $ args
 
 liskPApp = parens $ do
   op <- liskQName -- TODO: Restrict to constructor
