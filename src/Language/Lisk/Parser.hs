@@ -77,7 +77,10 @@ liskTyApp = parens $ do
         case op of
           TyCon (Special (TupleCon b n)) -> TyCon $ Special $ TupleCon b $ length args
           _ -> op
-  return $ foldl TyApp op' args
+  case op of
+    TyCon o@(Special FunCon) -> 
+      return $ TyParen $ foldl1 (flip TyInfix o) args
+    _            -> return $ TyParen $ foldl TyApp op' args
 
 liskTyCon = TyCon <$> liskQName
 
@@ -102,7 +105,7 @@ liskMatch = parens $ do
   spaces1
   name <- liskName
   spaces1
-  pats <- (pure <$> liskPat) <|> parens (sepBy1 liskPat spaces1)
+  pats <- (pure <$> liskSimplePat) <|> parens (sepBy1 liskPat spaces1)
   typ <- return Nothing -- liskType -- TODO
   spaces1
   rhs <- liskRhs
@@ -115,8 +118,17 @@ liskBDecls = BDecls <$> pure [] -- TODO
 
 liskIPBinds = IPBinds <$> pure [] -- TODO
 
+liskSimplePat = liskPVar
+      <|> liskPLit
+      
 liskPat = liskPVar
-      <|> liskPLit -- TODO
+      <|> liskPLit
+      <|> liskPApp -- TODO
+
+liskPApp = parens $ do
+  op <- liskQName -- TODO: Restrict to constructor
+  args <- many1 $ spaces1 *> liskPat
+  return $ PApp op $ args
 
 liskPLit = PLit <$> liskLit
 
