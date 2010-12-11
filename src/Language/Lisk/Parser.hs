@@ -140,10 +140,13 @@ liskUnguardedRhs = UnGuardedRhs <$> liskExp
  -- TODO
 liskExp = try liskVar
           <|> Lit <$> try liskLit
+          <|> try liskUnit
           <|> try liskDo
           <|> try liskApp
           <|> Paren <$> parens liskExp
           
+liskUnit = parens $ return $ Con (Special UnitCon)
+
 liskDo = parens $ do
   string "do" <?> "do expression e.g. (do (<- x y) (return x))"
   spaces1

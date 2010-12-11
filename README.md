@@ -17,7 +17,8 @@ Latest working example:
     (:: main ('io ()))
     (= main (do (<- line get-line)
                 (let (= the-line line))
-                (foo the-line)))
+                (foo the-line)
+                (return ())))
 
     (:: foo (-> 'string ('io ())))
     (= foo x (put-str-ln (show (fib (read x)))))
