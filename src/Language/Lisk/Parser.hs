@@ -159,9 +159,6 @@ liskDo = parens $ do
   spaces1
   stmts <- many $ spaces *> liskStmt
   return $ Do stmts
-  
-x = do x <- return 1
-       return 1
 
 liskStmt = try liskGenerator <|> 
            try liskLetStmt <|> 
@@ -235,7 +232,18 @@ liskPVar = PVar <$> liskName
 
 liskQName = try liskSpecial <|> try liskQual <|> try liskUnQual
 
-liskQual = mzero -- TODO
+liskQual = do
+  prime <- (const True <$> (lookAhead (string "'") *> string "'"))
+          <|> pure False
+  word <- liskModuleName <?> "module name e.g. data.char"
+  let (ModuleName word') = word
+      (name,mod) = (downFirst . reverse *** reverse . drop 1) $
+                   span (/='.') $ reverse word'
+      downFirst (x:xs) | not prime = toLower x : xs
+      downFirst xs                 = xs
+  return $ if null mod 
+     then UnQual (Ident name)
+     else Qual (ModuleName mod) (Ident name)
 
 liskUnQual = UnQual <$> liskName
 
@@ -247,7 +255,7 @@ liskSpecial = Special <$> spec where
 
 liskName = try liskIdent <|> liskSymbol
 
-liskVar = Var <$> liskUnQual
+liskVar = Var <$> liskQName
 
 liskIdent = Ident . hyphenToCamelCase . colonToConsTyp <$> ident where
     ident = ((++) <$> (string "'" <|> pure "")
