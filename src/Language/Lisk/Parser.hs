@@ -5,6 +5,7 @@
 {-# OPTIONS -fno-warn-missing-signatures #-}
 module Language.Lisk.Parser where
 
+import Data.Maybe
 import Data.List
 import Data.Either
 import Control.Monad.Reader
@@ -13,8 +14,8 @@ import Control.Arrow
 import Control.Applicative
 import Control.Monad.Identity
 import Data.Char
-import Text.Parsec hiding ((<|>),many,token)
-import Text.Parsec.Combinator
+import Text.Parsec hiding ((<|>),many,token,optional)
+import Text.Parsec.Combinator hiding (optional)
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Pretty
 import qualified Language.Haskell.Exts.Parser as P (parseExp,parse,ParseResult(..))
@@ -233,8 +234,7 @@ liskPVar = PVar <$> liskName
 liskQName = try liskSpecial <|> try liskQual <|> try liskUnQual
 
 liskQual = do
-  prime <- (const True <$> (lookAhead (string "'") *> string "'"))
-          <|> pure False
+  prime <- isJust <$> optional (string "'")
   word <- liskModuleName <?> "module name e.g. data.char"
   let (ModuleName word') = word
       (name,mod) = (downFirst . reverse *** reverse . drop 1) $
@@ -277,8 +277,11 @@ liskImportDeclModule =
     liskImportDeclModuleName <|> liskImportDeclModuleSpec
     
 liskImportDeclModuleSpec = parens $ do
-  imp <- liskImportDeclModuleSpec
-  return imp
+  name <- liskImportDeclModuleName
+  qualification <- optional $ spaces1 *> string ":as" *> spaces1 *>
+                              liskModuleName
+  return name { importQualified = isJust qualification
+              , importAs = qualification }
     
 liskImportDeclModuleName = do
   loc <- getLoc
