@@ -12,11 +12,12 @@ Latest working example:
     (module demo
       "A demo program!")
 
-    (import data.char system.io)
+    (import data.char system.io (data.map :as map))
 
     (:: main ('io ()))
     (= main (do (<- line get-line)
-                (let (= the-line line))
+                (let (= the-line line)
+                     (= some-map map.empty))
                 (foo the-line)
                 (return ())))
 
