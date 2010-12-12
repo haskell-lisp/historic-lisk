@@ -20,11 +20,6 @@ import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Pretty
 import qualified Language.Haskell.Exts.Parser as P (parseExp,parse,ParseResult(..))
  
-data LiskExpr = LSym SrcLoc String
-              | LTCM SrcLoc String
-              | LList SrcLoc [LiskExpr]
-  deriving Show
-
 type LP = Parsec String ()
 
 printLiskToHaskell = prettyPrint
