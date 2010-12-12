@@ -145,9 +145,19 @@ liskExp = try liskVar
           <|> Lit <$> try liskLit
           <|> try liskUnit
           <|> try liskDo
+          <|> try liskLambda
           <|> try liskApp
           <|> Paren <$> parens liskExp
           
+liskLambda = parens $ do
+  loc <- getLoc
+  string "fn" <?> "fn expression e.g. (fn (x y) (+ x y))"
+  spaces1
+  pats <- (pure <$> liskSimplePat) <|> parens (sepBy1 liskPat spaces1)
+  spaces1
+  e <- liskExp
+  return $ Lambda loc pats e
+
 liskUnit = parens $ return $ Con (Special UnitCon)
 
 liskDo = parens $ do
