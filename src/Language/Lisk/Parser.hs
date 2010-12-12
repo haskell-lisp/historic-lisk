@@ -47,7 +47,6 @@ liskModule = do
   spaces
   eof
   return $ Module loc name [] Nothing Nothing importDecls decls
-
   
 symbolOf = string
 
@@ -146,9 +145,61 @@ liskExp = try liskVar
           <|> try liskUnit
           <|> try liskDo
           <|> try liskLambda
+          <|> try liskCase
           <|> try liskApp
           <|> Paren <$> parens liskExp
-          
+
+liskCase = parens $ do
+  loc <- getLoc
+  string "case" <?> ("case expression e.g. (case (0 0)), (case :of x (0 0))"
+                     ++ ", (case :do getline (\"foo\" True))")
+  value <- optional $ try $ spaces1 *> char ':' *>
+             (Left <$> liskCaseOf <|> Right <$> liskCaseDo)
+  spaces1
+  alts <- sepBy1 (try liskAlt) spaces1
+  case value of
+    Just e -> case e of
+      Left of' -> return $ Case of' alts
+      Right do' -> do 
+        sym <- genSym
+        return $ (Paren (InfixApp do'
+                                  (QVarOp (UnQual (Symbol ">>=")))
+                                  (Lambda loc [PVar sym]
+                                    (Case (Var $ UnQual sym) alts))))
+    Nothing -> do 
+      sym <- genSym
+      return $ Lambda loc [PVar sym]
+                 $ Case (Var $ UnQual sym) alts
+
+liskAlt = parens $ do
+ loc <- getLoc
+ pat <- liskPat
+ spaces1
+ alts <- liskGuardedAlts
+ binds <- pure (BDecls [])
+ return $ Alt loc pat alts binds
+
+liskGuardedAlts = try liskGuardedAltsList <|> liskUnGuardedAlt
+
+liskGuardedAltsList = mzero
+
+liskUnGuardedAlt = UnGuardedAlt <$> liskExp
+
+genSym = do
+  loc <- getLoc
+  return $ Ident $
+    "_lisk_" ++ show (srcLine loc) ++ "_" ++ show (srcColumn loc)
+
+liskCaseOf = do
+  string "of"
+  spaces1
+  liskExp
+  
+liskCaseDo = do
+  string "do"
+  spaces1
+  liskExp
+
 liskLambda = parens $ do
   loc <- getLoc
   string "fn" <?> "fn expression e.g. (fn (x y) (+ x y))"
