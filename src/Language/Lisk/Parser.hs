@@ -50,8 +50,76 @@ liskModule = do
   
 symbolOf = string
 
-liskDecl = try liskTypeSig <|> try liskFunBind <|> liskPatBind
+liskDecl = try liskTypeInsDecl
+         <|> try liskDataDecl
+         <|> try liskTypeSig
+         <|> try liskFunBind <|> liskPatBind
 
+liskTypeInsDecl = parens $ do
+  loc <- getLoc
+  string "instance" <?> "type instance e.g. (instance ('show a) (show x \"foo\"))"
+  spaces1
+  (name,vars) <- parens $ do name <- liskQName
+                             spaces1
+                             vars <- many1 $ spaces *> liskTyVar
+                             return (name,vars)
+  spaces1
+  decls <- many1 ((InsDecl <$> liskDecl) <?> "method declaration e.g. (= x y)")
+  return $ InstDecl loc [] name vars decls
+
+liskDataDecl = parens $ do
+  loc <- getLoc
+  ty <- (<|>) (string "data" <?> "data declaration e.g. (data ('maybe a) ('just a) 'nothing)")
+        (string "newtype" <?> "newtype declaration e.g. (newtype 'x 'x 'int)")
+  spaces1
+  (vars,name) <- ((,) [] <$> liskName) <|> 
+                 parens (do name <- liskName
+                            vars <- many1 $ spaces *> liskName
+                            return (map UnkindedVar vars,name))
+  spaces1
+  conts <- many $ try $ spaces *> liskQualConDecl
+  let dat | ty == "data" = DataType
+          | otherwise    = NewType
+      context = [] -- TODO: context
+      derivin = []
+  derivin <- (spaces1 *> liskDerivings) <|> pure []
+  return $ DataDecl loc dat context name vars conts derivin
+
+liskDerivings = do
+  string ":deriving" <?> "deriving clause e.g. :deriving ('read 'show) or \
+                         \:deriving (('monad-state 'io))"
+  spaces1
+  parens $ many $ try $ spaces *> (liskDeriving <|> liskDerivingNoParams)
+
+liskDerivingNoParams = do
+  name <- liskQName
+  return $ (name,[])
+
+liskDeriving = parens $ do
+  name <- liskQName
+  typs <- many $ spaces *> liskType
+  return $ (name,typs)
+
+liskQualConDecl = liskConDecl <|> liskRecDecl
+
+liskConDecl = liskConDeclName <|> liskConDeclParams
+
+liskConDeclParams = parens $ do
+  loc <- getLoc
+  name <- liskName
+  spaces1
+  ps <- many $ spaces *> liskType
+  return $ QualConDecl loc ([]::[TyVarBind]) ([]::Context) $
+              ConDecl name $ map UnBangedTy ps
+
+liskConDeclName = do
+  loc <- getLoc
+  name <- liskName
+  return $ QualConDecl loc ([]::[TyVarBind]) ([]::Context) $
+             ConDecl name []
+
+liskRecDecl = mzero
+  
 liskTypeSig = parens $ do
   loc <- getLoc
   symbolOf "::" <?> "type signature e.g. (:: x 'string)"
@@ -62,7 +130,23 @@ liskTypeSig = parens $ do
   typ <- liskType
   return $ TypeSig loc idents typ
 
-liskType = try liskTyCon <|> try liskTyVar  <|> liskTyApp
+liskType = try liskTyCon <|> try liskTyVar  <|> 
+         try liskForall <|>
+         liskTyApp
+
+liskForall = parens $ do
+  string "=>"
+  spaces1
+  context <- pure <$> liskConstraint <|> many1 (try $ spaces *> liskConstraint)
+  spaces1
+  typ <- liskType
+  return $ TyForall Nothing context typ
+
+liskConstraint = parens $ do
+  class' <- liskQName
+  spaces1
+  vars <- sepBy1 liskTyVar spaces1
+  return $ ClassA class' vars
 
 liskTyApp = parens $ do
   op <- liskType
@@ -100,7 +184,7 @@ liskMatch = parens $ do
   spaces1
   name <- liskName
   spaces1
-  pats <- (pure <$> liskSimplePat) <|> parens (sepBy1 liskPat spaces1)
+  pats <- (pure <$> try liskSimplePat) <|> parens (sepBy1 liskPat spaces1)
   typ <- return Nothing -- liskType -- TODO
   spaces1
   rhs <- liskRhs
@@ -116,12 +200,31 @@ liskIPBinds = IPBinds <$> pure [] -- TODO
 
 liskSimplePat = liskPVar
       <|> liskPLit
+      <|> liskPatTypeSig
       
 liskPat = liskPVar
+      <|> liskWildCard
       <|> liskPLit
+      <|> try liskPatTypeSig
       <|> try liskPTuple
+      <|> liskPList
       <|> liskPApp
       -- TODO: There are a lot more.
+
+liskPList = do
+  char '['
+  els <- many $ try $ spaces *> liskPat
+  char ']'
+  return $ PList els
+
+liskPatTypeSig = fmap PParen $ parens $ do
+  loc <- getLoc
+  string "::"
+  spaces1
+  pat <- liskPat
+  spaces1
+  typ <- liskType
+  return $ PatTypeSig loc pat typ
 
 liskPTuple = parens $ do
   char ','
@@ -141,18 +244,35 @@ liskUnguardedRhs = UnGuardedRhs <$> liskExp
 
  -- TODO
 liskExp = try liskVar
-          <|> Lit <$> try liskLit
-          <|> try liskUnit
-          <|> try liskDo
-          <|> try liskLambda
-          <|> try liskCase
-          <|> try liskApp
-          <|> Paren <$> parens liskExp
+      <|> Lit <$> try liskLit
+      <|> try liskList
+      <|> try liskUnit
+      <|> try liskLet
+      <|> try liskDo
+      <|> try liskLambda
+      <|> try liskCase
+      <|> try liskApp
+      <|> Paren <$> parens liskExp
+
+liskList = do
+  char '['
+  els <- many $ try $ spaces *> liskExp
+  char ']'
+  return $ List els
+
+liskLet = parens $ do
+  loc <- getLoc
+  string "let" <?> "let expression e.g. (let ((= x 1)) x)"
+  spaces1
+  binds <- parens $ liskBinds
+  spaces1
+  exp <- liskExp
+  return $ Let binds exp
 
 liskCase = parens $ do
   loc <- getLoc
   string "case" <?> ("case expression e.g. (case (0 0)), (case :of x (0 0))"
-                     ++ ", (case :do getline (\"foo\" True))")
+                     ++ ", (case :do get-line (\"foo\" True))")
   value <- optional $ try $ spaces1 *> char ':' *>
              (Left <$> liskCaseOf <|> Right <$> liskCaseDo)
   spaces1
@@ -172,16 +292,37 @@ liskCase = parens $ do
                  $ Case (Var $ UnQual sym) alts
 
 liskAlt = parens $ do
- loc <- getLoc
- pat <- liskPat
- spaces1
- alts <- liskGuardedAlts
- binds <- pure (BDecls [])
- return $ Alt loc pat alts binds
+  loc <- getLoc
+  pat <- liskPat
+  spaces1
+  alts <- liskGuardedAlts
+  binds <- pure (BDecls [])
+  return $ Alt loc pat alts binds
 
-liskGuardedAlts = try liskGuardedAltsList <|> liskUnGuardedAlt
+liskGuardedAlts = try liskGuardUnless <|> try liskGuardedAltsList <|> liskUnGuardedAlt
 
-liskGuardedAltsList = mzero
+liskGuardUnless = do
+  string ":unless" <?> "unless clause e.g. (xs :unless (null xs) (map (+ 1) xs))"
+  spaces1
+  alt <- liskGuardedAlt
+  let GuardedAlt loc [Qualifier stmts] exp = alt
+      alt' = GuardedAlt loc [Qualifier $ App (Var (UnQual (Symbol "not")))
+                                             stmts]
+                            exp
+  return $ GuardedAlts [alt']
+
+liskGuardedAltsList = do
+  string ":when" <?> "when clause e.g. (xs :when ((null xs) []))"
+  spaces1
+  alts <- many1 $ try $ spaces *> parens liskGuardedAlt
+  return $ GuardedAlts alts
+
+liskGuardedAlt = do
+  loc <- getLoc
+  quals <- pure <$> liskQualifier
+  spaces1
+  exp <- liskExp
+  return $ GuardedAlt loc quals exp
 
 liskUnGuardedAlt = UnGuardedAlt <$> liskExp
 
@@ -289,6 +430,8 @@ liskPVar = PVar <$> liskName
 
 liskQName = try liskSpecial <|> try liskQual <|> try liskUnQual
 
+liskWildCard = pure (PWildCard) <* char '_'
+
 liskQual = do
   prime <- isJust <$> optional (string "'")
   word <- liskModuleName <?> "module name e.g. data.char"
@@ -306,6 +449,7 @@ liskUnQual = UnQual <$> liskName
 liskSpecial = Special <$> spec where
     spec = string "()"  *> pure UnitCon
        <|> string "[]"  *> pure ListCon
+       <|> string ":"   *> pure Cons
        <|> string "->"  *> pure FunCon
        <|> string ","   *> pure (TupleCon Boxed{-TODO:boxed-} 0)
 
@@ -321,8 +465,6 @@ colonToConsTyp ('\'':x:xs) = toUpper x : xs
 colonToConsTyp xs = xs
 
 liskSymbol = Symbol <$> many1 liskIdentifierToken
-
-liskList = mzero -- TODO
 
 liskImportDecl = parens $ do
   symbolOf "import" <?> "import list e.g. (import prelude data.list (system.char is-upper to-lower))"
