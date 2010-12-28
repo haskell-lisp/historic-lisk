@@ -454,7 +454,7 @@ liskSpecial = Special <$> spec where
 
 liskName = try liskIdent <|> liskSymbol
 
-liskVar = Var <$> liskQName
+liskVar = Var <$> (liskOp <|> liskQName)
 
 liskIdent = Ident . hyphenToCamelCase . colonToConsTyp <$> ident where
     ident = ((++) <$> (string "'" <|> pure "")
