@@ -99,7 +99,7 @@ liskDeriving = parens $ do
   typs <- many $ spaces *> liskType
   return $ (name,typs)
 
-liskQualConDecl = liskConDecl <|> liskRecDecl
+liskQualConDecl = try liskRecDecl <|> liskConDecl
 
 liskConDecl = liskConDeclName <|> liskConDeclParams
 
@@ -117,8 +117,22 @@ liskConDeclName = do
   return $ QualConDecl loc ([]::[TyVarBind]) ([]::Context) $
              ConDecl name []
 
-liskRecDecl = mzero
-  
+liskRecDecl = parens $ do
+  loc <- getLoc
+  name <- liskName
+  spaces1
+  string ":fields"
+  spaces1
+  fields  <- parens $ many1 $ spaces *> liskRecDeclField
+  pure $ QualConDecl loc ([]::[TyVarBind]) ([]::Context) $
+          RecDecl name fields
+
+liskRecDeclField = parens $ do
+  name <- liskName
+  spaces1
+  ty <- liskType
+  pure ([name],UnBangedTy ty)
+
 liskTypeSig = parens $ do
   loc <- getLoc
   symbolOf "::" <?> "type signature e.g. (:: x 'string)"
@@ -523,8 +537,6 @@ parens = between (char '(') (char ')')
 
 suggest = "\n(are you trying to use not-currently-supported syntax?)"
 
-bi f g = f . g . f
-
 spaces = do
   (many1 space *> spaces)
   <|> ((string "--" <|> string ";;") *> manyTill anyChar ((newline *> pure ()) <|> eof) *> spaces)
@@ -533,3 +545,13 @@ spaces = do
 spaces1 = do
  space
  spaces
+
+spaced1 p = (:) <$> p <*> (try (spaces1 *> spaced p) <|> pure [])
+
+spaced p = go where
+  go = do x <- Just <$> p <|> pure Nothing
+          case x of
+            Just x' -> do
+              a <- spaces *> go
+              pure (x':a)
+            Nothing -> pure []
