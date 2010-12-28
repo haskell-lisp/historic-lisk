@@ -14,7 +14,7 @@ import Control.Arrow
 import Control.Applicative
 import Control.Monad.Identity
 import Data.Char
-import Text.Parsec hiding ((<|>),many,token,optional)
+import Text.Parsec hiding ((<|>),many,token,optional,spaces)
 import Text.Parsec.Combinator hiding (optional)
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Pretty
@@ -24,7 +24,7 @@ type LP = Parsec String ()
 
 printLiskToHaskell = prettyPrint
 
-parseLisk = parse (spaces *> liskModule <* spaces)
+parseLisk = parse (spaces *> liskModule <* spaces) 
 
 printLiskFragment p = either (putStrLn.show) (putStrLn.prettyPrint) . parse p ""
 
@@ -63,8 +63,7 @@ liskTypeInsDecl = parens $ do
                              spaces1
                              vars <- many1 $ spaces *> liskTyVar
                              return (name,vars)
-  spaces1
-  decls <- many1 ((InsDecl <$> liskDecl) <?> "method declaration e.g. (= x y)")
+  decls <- many ((InsDecl <$> (try $ spaces *> liskDecl)) <?> "method declaration e.g. (= x y)")
   return $ InstDecl loc [] name vars decls
 
 liskDataDecl = parens $ do
@@ -526,4 +525,11 @@ suggest = "\n(are you trying to use not-currently-supported syntax?)"
 
 bi f g = f . g . f
 
-spaces1 = many1 space
+spaces = do
+  (many1 space *> spaces)
+  <|> ((string "--" <|> string ";;") *> manyTill anyChar ((newline *> pure ()) <|> eof) *> spaces)
+  <|> pure ()
+
+spaces1 = do
+ space
+ spaces
