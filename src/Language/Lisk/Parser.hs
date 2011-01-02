@@ -244,7 +244,7 @@ liskPTuple = parens $ do
   args <- many1 $ spaces1 *> liskPat
   return $ PTuple $ args
 
-liskPApp = parens $ do
+liskPApp = fmap PParen $ parens $ do
   op <- liskQName -- TODO: Restrict to constructor
   args <- many1 $ spaces1 *> liskPat
   return $ PApp op $ args
@@ -358,7 +358,7 @@ liskLambda = parens $ do
   loc <- getLoc
   string "fn" <?> "fn expression e.g. (fn (x y) (+ x y))"
   spaces1
-  pats <- (pure <$> liskSimplePat) <|> parens (sepBy1 liskPat spaces1)
+  pats <- (try $ pure <$> liskSimplePat) <|> parens (many1 (spaces *> liskPat))
   spaces1
   e <- liskExp
   return $ Lambda loc pats e
