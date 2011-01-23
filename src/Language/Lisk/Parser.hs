@@ -47,7 +47,7 @@ liskModule = do
   spaces
   eof
   return $ Module loc name [] Nothing Nothing importDecls decls
-  
+
 symbolOf = string
 
 liskDecl = try liskTypeInsDecl
@@ -421,7 +421,8 @@ liskOpPartial = parens $ do
   e <- liskExp
   return $ App op e
 
-liskOp = UnQual . Symbol <$> many1 (oneOf ".*-+/\\=<>")
+liskOp = UnQual . Symbol <$> 
+         many1 (oneOf ".*-+/\\=<>$#&")
 
 liskLit = liskChar <|> try liskString <|> liskInt
 
@@ -464,7 +465,8 @@ liskSpecial = Special <$> spec where
        <|> string "[]"  *> pure ListCon
        <|> string ":"   *> pure Cons
        <|> string "->"  *> pure FunCon
-       <|> string ","   *> pure (TupleCon Boxed{-TODO:boxed-} 0)
+       <|> do cs <- many1 (char ',') 
+              pure (TupleCon Boxed (1 + length cs))
 
 liskName = try liskIdent <|> liskSymbol
 
