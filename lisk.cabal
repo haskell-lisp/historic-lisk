@@ -61,3 +61,12 @@ Executable lisk
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
   
+
+Library
+  Exposed-modules: Language.Lisk.Parser
+  Hs-source-dirs: src
+  Build-depends:      base >= 4 && < 5,
+                      haskell-src-exts == 1.9.*,
+                      parsec == 3.*,
+                      mtl,
+                      regex-compat == 0.93.*

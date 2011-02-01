@@ -22,6 +22,8 @@ import qualified Language.Haskell.Exts.Parser as P (parseExp,parse,ParseResult(.
  
 type LP = Parsec String ()
 
+parseLiskExp = parse liskExp
+
 printLiskToHaskell = prettyPrint
 
 parseLisk = parse (spaces *> liskModule <* spaces) 
