@@ -32,6 +32,8 @@ printLisk str =
   case parse liskModule "" str of
     Left e   -> error $ show e ++ suggest
     Right ex -> putStrLn $ prettyPrint ex
+    
+
 
 liskModule = do
   loc <- getLoc
@@ -257,6 +259,7 @@ liskUnguardedRhs = UnGuardedRhs <$> liskExp
 
  -- TODO
 liskExp = try liskVar
+      <|> try liskExpTypeSig
       <|> Lit <$> try liskLit
       <|> try liskList
       <|> try liskUnit
@@ -266,6 +269,15 @@ liskExp = try liskVar
       <|> try liskCase
       <|> try liskApp
       <|> Paren <$> parens liskExp
+
+liskExpTypeSig = parens $ do
+  loc <- getLoc
+  string "::" <?> "type signature e.g. (:: x 'int)"
+  spaces1
+  e <- liskExp
+  spaces1
+  t <- liskType
+  return $ ExpTypeSig loc e t
 
 liskList = do
   char '['
