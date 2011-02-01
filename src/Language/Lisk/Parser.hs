@@ -436,7 +436,7 @@ liskOpPartial = parens $ do
   return $ App op e
 
 liskOp = UnQual . Symbol <$> 
-         many1 (oneOf ".*-+/\\=<>$#&")
+         many1 (oneOf ".*-+/\\=<>$#&:")
 
 liskLit = liskChar <|> try liskString <|> liskInt
 
