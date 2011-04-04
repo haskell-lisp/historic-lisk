@@ -18,7 +18,9 @@ import Text.Parsec hiding ((<|>),many,token,optional,spaces)
 import Text.Parsec.Combinator hiding (optional)
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Pretty
-import qualified Language.Haskell.Exts.Parser as P (parseExp,parse,ParseResult(..))
+import qualified Language.Haskell.Exts.Parser as P 
+      (parseExp,parse,parseWithMode,defaultParseMode,ParseMode(..),ParseResult(..))
+import qualified Language.Haskell.Exts.Extension as P
  
 type LP = Parsec String ()
 
@@ -34,8 +36,6 @@ printLisk str =
   case parse liskModule "" str of
     Left e   -> error $ show e ++ suggest
     Right ex -> putStrLn $ prettyPrint ex
-    
-
 
 liskModule = do
   loc <- getLoc
@@ -56,8 +56,10 @@ symbolOf = string
 
 liskDecl = try liskTypeInsDecl
          <|> try liskDataDecl
+         <|> try liskTypeDecl
          <|> try liskTypeSig
-         <|> try liskFunBind <|> liskPatBind
+         <|> try liskFunBind
+         <|> liskPatBind
 
 liskTypeInsDecl = parens $ do
   loc <- getLoc
@@ -69,6 +71,15 @@ liskTypeInsDecl = parens $ do
                              return (name,vars)
   decls <- many ((InsDecl <$> (try $ spaces *> liskDecl)) <?> "method declaration e.g. (= x y)")
   return $ InstDecl loc [] name vars decls
+
+liskTypeDecl = parens $ do
+  loc <- getLoc
+  string "type"
+  spaces1
+  ident <- liskName
+  spaces1
+  typ <- liskType
+  return $ TypeDecl loc ident [] typ
 
 liskDataDecl = parens $ do
   loc <- getLoc
@@ -84,7 +95,6 @@ liskDataDecl = parens $ do
   let dat | ty == "data" = DataType
           | otherwise    = NewType
       context = [] -- TODO: context
-      derivin = []
   derivin <- (spaces1 *> liskDerivings) <|> pure []
   return $ DataDecl loc dat context name vars conts derivin
 
@@ -218,8 +228,9 @@ liskIPBinds = IPBinds <$> pure [] -- TODO
 liskSimplePat = liskPVar
       <|> liskPLit
       <|> liskPatTypeSig
-      
+
 liskPat = liskPVar
+      <|> try liskPFieldWildCard
       <|> liskWildCard
       <|> liskPLit
       <|> try liskPatTypeSig
@@ -227,6 +238,12 @@ liskPat = liskPVar
       <|> liskPList
       <|> liskPApp
       -- TODO: There are a lot more.
+
+liskPFieldWildCard = parens $ do
+  name <- liskQName
+  spaces1
+  string ".."
+  return $ PRec name [PFieldWildcard]
 
 liskPList = do
   char '['
