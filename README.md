@@ -7,6 +7,7 @@ This software is incomplete. Don't try to use it.
 
 Latest working example:
 
+````common-lisp
     {-# OPTIONS -F -pgmF lisk #-}
 
     (module demo
@@ -47,3 +48,4 @@ Latest working example:
     (:: from-just (-> ('maybe a) a a))
     (= from-just (('just a) b) a)
     (= from-just ('nothing b) b)
+```
